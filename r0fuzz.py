@@ -16,7 +16,7 @@ from pyfiglet import figlet_format
 
 class r0fuzz(object):
 
-    supported_protocol = ["modbus", "dnp3"]
+    supported_protocol = ["modbus"]
 
     def __init__(self, args):
         self.protocol = args.target
@@ -61,38 +61,28 @@ def main():
     global logging
 
     init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
-    
-    print(
-        ''' ______ ___________ _   _  ______ ______
- | ___ \  _  |  ___| | | ||___  /|___  /
- | |_/ / |/' | |_  | | | |   / /    / /
- |    /|  /| |  _| | | | |  / /    / /
- | |\ \\\\ |_/ / |   | |_| |./ /___./ /___
- \_| \_|\___/\_|    \___/ \_____/\_____/
-'''
+    cprint(
+        figlet_format("R0FUZZ", font="doom", width=110), "yellow", attrs=["bold"]
     )
 
     parser = argparse.ArgumentParser(
-        description="A grammar based fuzzer for SCADA protocols"
+        description="A fuzzer for OT-network protocols"
     )
     subparser = parser.add_subparsers(dest="command")
+    
     dumb = subparser.add_parser("dumb", help="Dumb fuzzing")
-    mutate = subparser.add_parser(
-        "mutate", help="Mutation based fuzzing"
-    )
-    generate = subparser.add_parser(
-        "generate", help="Generation based fuzzing"
-    )
+    mutate = subparser.add_parser("mutate", help="Mutation-based fuzzing")
+    generate = subparser.add_parser("generate", help="Generation-based fuzzing")
 
     parser.add_argument(
-        "-t", help="Target Protocol [modbus/dnp3]", type=str, required=True
+        "-t", "--target", help="Target Protocol [modbus/dnp3]", type=str, required=True
     )
     parser.add_argument("-v", "--verbosity", help="Log level", action="count")
     parser.add_argument("-i", "--ip", help="Target IP Address [= 127.0.0.1]", default="127.0.0.1")
     parser.add_argument("-p", "--port", help="Target Port [= 1234]", type=int, default=1234)
-
+    
     mutate.add_argument(
-        "-s", "--seed", help="Sample Input file", type=str, required=True
+        "-s", "--seed", help="Sample input file", type=str, required=True
     )
 
     args = parser.parse_args()
@@ -103,7 +93,7 @@ def main():
 
     if r0obj.command == "mutate":
         if r0obj.protocol == "modbus":
-            extracted_fields = r0obj.extractor.generate_fields()
+            extracted_fields = r0obj.extractor.extract_fields_from_packets(r0obj.protocol)
             r0obj.packgen.formPacket(extracted_fields)
             logging.info("[+] Generated fields")
 

@@ -48,9 +48,7 @@ class PackGen(object):
     def send_system(self, packet):
 
         self.logger.debug("send_packet")
-
         print("[*] Sent: %s" % hexstr(packet))
-
         self.logger.debug("[+] Sent Packet: %s" % hexstr(packet))
 
         base64_str = base64.b64encode(
@@ -58,32 +56,23 @@ class PackGen(object):
         ).decode()  # null byte to continue sending packets
 
         command = f"echo {base64_str} | base64 -d | nc {self.HOST} {self.dest_port}"
-
         os.system(command)
 
     def mutate_bytes_radamsa(self, data, length):
-
         if type(data) != bytes:
-
             struct_const = [">B", ">H"]
-
             data = data & pow(2, (8 * length)) - 1
             data = struct.pack(struct_const[length - 1], data)
-
         while 1:
-
             mutated_string = self.pyradamsa_obj.fuzz(data, max_mut=length)
-
             if (
                 mutated_string != bytes(length)
                 and mutated_string != b""
                 and len(mutated_string) == length
             ):
-
                 return mutated_string
 
     def get_valid_address(self, data, fn_code):
-
         return (
             int.from_bytes(data, "big")
             % (self.valid_address[fn_code][1] - self.valid_address[fn_code][0] + 1)
@@ -91,16 +80,13 @@ class PackGen(object):
         )
 
     def mutate_packet(self, packet):
-
-
         tmp_packet = b""
-        # fn_code
-        fn_code = random.choice([1, 2, 3, 5, 6, 16, 23]) 
+        fn_code_list = [1, 2, 3, 5, 6, 16, 23]
+        fn_code = random.choice(fn_code_list) 
         function_code = struct.pack(">B", fn_code)
 
-        if (fn_code > 6):
-            # set length to 16 for function codes 16,23
-            
+
+        if fn_code in fn_code_list[-2:]:            
             # function data 1 / Start Address
             func_data1 = self.mutate_bytes_radamsa(packet[8:12], 2)
 
@@ -170,20 +156,16 @@ class PackGen(object):
                 )
 
         else:
-
             for tmp_tuple in self.grammar_data[str(fn_code)]:
-
                 indx, bytes_count, to_mutate = tmp_tuple
-
+                
                 # mutate packets
-
                 if to_mutate:
                     k = self.mutate_bytes_radamsa(packet[indx:indx+bytes_count], bytes_count)
                 else:
                     k = packet[indx:indx+bytes_count]
 
                 match indx:
-
                     case 10:
                         k =  struct.pack(">H",((int.from_bytes(k, "big") % 0x10) + 1))
                     case 8:
@@ -201,17 +183,15 @@ class PackGen(object):
         return tmp_packet
 
     def formPacket(self, fields_dict):
-
         self.logger.debug("formPacket")
-
         ret_val = None
-
         packet = {}
         for key in fields_dict.keys():
-            packet[key] = fields_dict[key][random.randint(0, 9)]
+            packet[key] = fields_dict[key][random.randint( 0, len(fields_dict[key])-1 )]
 
         # tmp_packet
         # packet = {'transID1': 122, 'transID2': 24, 'protoID1': 0, 'protoID2': 0, 'length1': 0, 'length2': 6, 'unitID': 1, 'functionCode': 4, 'functionData1': b'\xC8', 'functionData2': 1}
+        
         cnt = 0
         temp_packet = []
         for i in packet.values():
@@ -227,7 +207,7 @@ class PackGen(object):
             cnt+=1
             print(cnt)
             if ret_val:
-                print("[*] M0dified Base Packet")
+                print("[*] Modified Base Packet")
                 #time.sleep(2)
                 packet = ret_val
             # self.send_socket(packet)

@@ -9,7 +9,6 @@
 Finding security flaws effectively and efficiently in Industrial Control Systems is of great importance as such systems are used in various important industries like nuclear power plants. *r0fuzz* aims to find security flaws in the hardware network protocols like MODBUS, DNP3 etc.
 
 ## Table of Contents <!-- omit in toc -->
-
 - [1. Architecture](#1-architecture)
 - [2. Installation](#2-installation)
 - [3. Usage](#3-usage)
@@ -23,20 +22,18 @@ Finding security flaws effectively and efficiently in Industrial Control Systems
 </p>
 
 ## 2. Installation
-
-- Python virtual environment (Python >= 3.8)
+- Python virtual environment (Tested on Python 3.10)
 
 ```shell
-git clone https://github.com/traboda/r0fuzz.git
+git clone https://github.com/br34dcrumb/r0fuzz.git
 cd r0fuzz
 
-python3 -m venv fuzz_env
-. fuzz_env/bin/activate
+python3 -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ## 3. Usage
-
 ```shell
 usage: r0fuzz.py [-h] -t TARGET [-v] [-i IP] [-p PORT] {dumb,mutate,generate} ...
 
@@ -55,19 +52,17 @@ options:
   -p PORT, --port PORT  Target Port
 
 ```
-## 4. Demos
 
+## 4. Demos
 You can find the demos [here](/demos).
 
 ## 5. Features:
-
 - Mutation based fuzzing
 - Generation-based fuzzing 
-- Driver module for the collaboration between mutation and generation based fuzzing. (WIP)
 - Incorporate other ICS protocols support. (WIP)
+- Driver module for the collaboration between mutation and generation based fuzzing. (WIP)
 - Fuzzing Using Hardware breakpoints. (WIP)
 
 ## 6. References
-- [This project is an extension of our old project](https://github.com/AshwAthi8/R0fuzz/tree/master)
-- [boofuzz](https://pypi.org/project/boofuzz/)
-- [radasma](https://pypi.org/project/pyradamsa/)
+- [BooFuzz](https://pypi.org/project/boofuzz/)
+- [Radamsa](https://pypi.org/project/pyradamsa/)

@@ -1,172 +1,63 @@
-from core.logger import get_logger
-
 from scapy.all import *
-import binascii
+import argparse
 
 class Extractor(object):
-    def __init__(self, r0obj):
-        # needed pcap
-        self.r0obj = r0obj
-        self.input = self.r0obj.seed
-        self.layer = "TCP"
-        self.field = "load"
-        self.PORT = 502
-        self.verbosity = self.r0obj.log_level
+    def __init__(self, r0obj, verbosity="INFO"):
+        self.PORT_MODBUS = 502
+        self.input = r0obj.seed
+        self.verbosity = verbosity
 
-        self.logger = get_logger("Extractor", self.verbosity)
-
-    def extract_load_dnp3(self, pac):
+    def extract_modbus_fields(self, packets):
         """
-        Extract the fields form sample packet
-        Return: dictionary
+        Extract Modbus fields from a single packet and update the fields_dict.
         """
+        fields_dict = {"transID1": [], "transID2": [], "protoID1": [], "protoID2": [], "length1": [], "length2": [], "unitID": [], "functionCode": [], "start_addr": [], "count": [] }
 
-        c = 0
+        for packet in packets:
+            try:
+                print(packet["TCP"].sport)
+                if packet.haslayer("TCP") and packet["TCP"].sport == self.PORT_MODBUS:
+                    hex_val = getattr(packet["TCP"], "load")
+                    packet_len = len(hex_val)
+                    print(packet_len)
+                    
+                    if (packet_len >= 12):
+                        fields_dict["transID1"].append(hex_val[0])
+                        fields_dict["transID2"].append(hex_val[1])
+                        fields_dict["protoID1"].append(hex_val[2])
+                        fields_dict["protoID2"].append(hex_val[3])
+                        fields_dict["length1"].append(hex_val[4])
+                        fields_dict["length2"].append(hex_val[5])
+                        fields_dict["unitID"].append(hex_val[6])
+                        fields_dict["functionCode"].append(hex_val[7])
+                        fields_dict["start_addr"].append(hex_val[8:10])
+                        fields_dict["count"].append(hex_val[10:12])
+                        
+            except Exception as e:
+                print(f"Error extracting Modbus fields: {e}")
+                return None
 
-        fields_dic = {"link": {}, "transport": {}, "apdu": {}}
+        return fields_dict
 
-        link = {
-            "seq": [],
-            "framelength": [],
-            "control": [],
-            "dest1": [],
-            "dest2": [],
-            "source1": [],
-            "source2": [],
-            "crc": [],
-        }
 
-        transport = {"transcntl": []}
-
-        apdu = {
-            "appcntrl": [],
-            "fc": [],
-            # "idx1":[],
-            # "idx2":[],
-            # "cntrlcode":[],
-            # "data":[]
-            "obj": {},
-        }
-
-        for p in pac:
-            if p.haslayer("TCP") and p[self.layer].dport == self.PORT_DNP3:
-                # print("i need this")
-                hex_val = binascii.hexlify(
-                    getattr(p[self.layer_extract_dnp3], self.field)
-                )
-                print(hex_val)
-                packet_len = len(hex_val)
-                print(packet_len)
-
-                fields_dic["link"].append(hex_val[0:10])
-                fields_dic["transport"].append(hex_val[11])
-                fields_dic["apdu"].append(hex_val[12:])
-
-                link["seq"].append(fields_dic["link"][0:2])
-                link["framelength"].append(fields_dic["link"][2])
-                link["control"].append(fields_dic["link"][3])
-                link["dest1"].append(fields_dic["link"][4])
-                link["dest2"].append(fields_dic["link"][5])
-                link["source1"].append(fields_dic["link"][6])
-                link["source2"].append(fields_dic["link"][7])
-                link["crc"].append(fields_dic["link"][8:10])
-
-                transport["transcntl"].append(fields_dic["transport"][0])
-
-                apdu["appcntrl"].append(fields_dic["apdu"][0])
-                apdu["fc"].append(fields_dic["apdu"][1])
-                apdu["obj"].append(fields_dic["apdu"][2:])
-
-                c = c + 1
-
-                # self.logger.debug('[+] Extracted fields')
-                # print(fields_dic)
-
-                if c == 10:
-                    self.logger.debug("[+] Extracted fields")
-                return fields_dic
-
-    def extract_load(self, pac):
+    def extract_fields_from_packets(self, protocol):
         """
-        Extract the fields from sample packet
-        Return: dictionary
+        Extract fields from a list of packets based on the specified protocol.
         """
+        packets = rdpcap(self.input)
+        if protocol == "modbus":
+            extracted_data = self.extract_modbus_fields(packets)
+        else:
+            raise ValueError("[X] Unsupported protocol")
 
-        c = 0
-        fields_dic = {
-            "transID1": [],
-            "transID2": [],
-            "protoID1": [],
-            "protoID2": [],
-            "length1": [],
-            "length2": [],
-            "unitID": [],
-            "functionCode": [],
-            "start_addr": [],
-            "count": [],
-        }
-
-        for p in pac:
-            if p.haslayer("TCP") and p[self.layer].sport == self.PORT:
-                hex_val = getattr(p[self.layer], self.field)
-
-                packet_len = len(hex_val)
-
-                if packet_len < 13:
-                    continue
-
-                fields_dic["transID1"].append(hex_val[0])
-                fields_dic["transID2"].append(hex_val[1])
-                fields_dic["protoID1"].append(hex_val[2])
-                fields_dic["protoID2"].append(hex_val[3])
-                fields_dic["length1"].append(hex_val[4])
-                fields_dic["length2"].append(hex_val[5])
-                fields_dic["unitID"].append(hex_val[6])
-                fields_dic["functionCode"].append(hex_val[7])
-                fields_dic["start_addr"].append(hex_val[8:10])
-                fields_dic["count"].append(hex_val[10:12])
-
-                c = c + 1
-
-                if c == 10:
-
-                    self.logger.debug("[+] Extracted fields")
-                    return fields_dic
-
-    def generate_fields(self):
-
-        # print("[*] Starting Server")
-        # print("[*] Run ./server/check_kill.sh  2>&1 | tee ./logs/simulation_logs") # for simulating libmodbus
-
-        try:
-            pac1 = rdpcap(self.input)
-        except Exception as e:
-            self.logger.error(e)
-            self.logger.warning("[*] Unable to read the file")
-            return False
-
-        self.logger.debug("[+] Read file: " + self.input)
-        return self.extract_load(pac1)
-        # print(extracted_fields)
-
-    def generate_fields_dnp3(self):
-
-        try:
-            pac2 = rdpcap(self.input)
-        except Exception as e:
-            self.logger.error(e)
-            self.logger.warning("[*] Unable to read the file")
-            return False
-
-        self.logger.debug("[+] Read file: " + self.input)
-        return self.extract_load_dnp3(pac2)
-
+        return dict(extracted_data)
+    
 def main():
-    import argparse
-
     # Argument parser for command-line arguments
     parser = argparse.ArgumentParser(description="Extract fields from a pcap file.")
-    parser.add_argument("pcap_file", type=str, help="Path to the pcap file")
+    parser.add_argument(
+        "pcap_file", type=str, help="Path to the pcap file"
+    )
     parser.add_argument(
         "--protocol",
         type=str,
@@ -181,40 +72,32 @@ def main():
         default="INFO",
         help="Log level (default: INFO)",
     )
-
     args = parser.parse_args()
 
-    # Mock r0obj for the Extractor class
-    class R0Obj:
-        def __init__(self, seed, log_level):
-            self.seed = seed
-            self.log_level = log_level
-
-    r0obj = R0Obj(args.pcap_file, args.log_level)
-
     # Instantiate the Extractor class
-    extractor = Extractor(r0obj)
+    extractor = Extractor(verbosity=args.log_level)
 
-    # Generate fields based on the protocol
+    # Read the pcap file
+    try:
+        packets = rdpcap(args.pcap_file)
+        print(f"[+] Successfully read {len(packets)} packets from {args.pcap_file}")
+    except Exception as e:
+        print(f"[X] Unable to read the file: {e}")
+        return
+
+    # Extract fields based on the protocol
     if args.protocol == "modbus":
-        extracted_fields = extractor.generate_fields()
-    elif args.protocol == "dnp3":
-        extracted_fields = extractor.generate_fields_dnp3()
+        extracted_fields = extractor.extract_fields_from_packets(packets, protocol="modbus")
 
     # Print the extracted fields
     if extracted_fields:
         print("\nExtracted Fields:")
-        for key, value in extracted_fields.items():
-            print(f"{key}: {value}")
+        for idx, fields in enumerate(extracted_fields, start=1):
+            print(f"\nPacket {idx}:")
+            for key, value in fields.items():
+                print(f"{key}: {value}")
     else:
         print("No fields extracted.")
 
 if __name__ == "__main__":
     main()
-
-
-"""
-len [0x1d,0x5,0x6,0x18]
-fn_code [1, 3, 15, 16]
-{'transaction_id': [b'0796', b'0796', b'7a18', b'7a18', b'2d04', b'2d04'], 'proc_id': [b'0000', b'0000', b'0000', b'0000', b'0000', b'0000'], 'length': [b'001d', b'001d', b'0005', b'0005', b'001d', b'001d'], 'Unit_id': [b'01', b'01', b'', b'', b'01', b'01'], 'func_code': [b'03', b'03', b'', b'', b'03', b'03'], 'count': [b'1a', b'1a', b'', b'', b'1a', b'1a'], 'reg_values': [b'001c000000590000001e00010059000000000000138800001388', b'001c000000590000001e00010059000000000000138800001388', b'', b'', b'00180000005a0000001500000059000000000000138800001388', b'00180000005a0000001500000059000000000000138800001388']}
-"""
